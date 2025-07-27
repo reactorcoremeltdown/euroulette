@@ -1,4 +1,4 @@
-module git.rcmd.space/rcmd/roulette
+module github.com/reactorcoremeltdown/euroulette
 
 go 1.24.4
 
