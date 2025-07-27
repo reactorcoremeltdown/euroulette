@@ -12,7 +12,6 @@ import (
 	"github.com/eiannone/keyboard"
 )
 
-var debug bool
 var finalIndex int
 var wheel = []string{
 	" 0", "32", "15", "19", " 4", "21", " 2", "25", "17", "34", " 6",
@@ -50,7 +49,7 @@ func cleanupAndExit() {
 	os.Exit(0)
 }
 
-func spinUntilStop(startIndex int, stopChan chan struct{}) {
+func spinUntilStop(debug bool, startIndex int, stopChan chan struct{}) {
 	index := startIndex
 	for {
 		select {
@@ -68,10 +67,14 @@ func spinUntilStop(startIndex int, stopChan chan struct{}) {
 	}
 }
 
-func spinWithInertia(startIndex int) string {
+func spinWithInertia(debug bool, startIndex int) string {
 	index := startIndex
 	delay := 40 * time.Millisecond
 	steps := rand.Intn(15) + 25
+
+	if debug {
+		log.Printf("Slowing down for %d steps\n", steps)
+	}
 
 	for i := 0; i < steps; i++ {
 		fmt.Printf("\r🎲 %s ", colorize(wheel[index]))
@@ -86,6 +89,7 @@ func spinWithInertia(startIndex int) string {
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
+	var debug bool
 	debug, err := strconv.ParseBool(os.Getenv("EUROULETTE_DEBUG"))
 	if err != nil {
 		debug = false
@@ -129,7 +133,7 @@ func main() {
 		stopChan := make(chan struct{})
 
 		go func() {
-			spinUntilStop(startIndex, stopChan)
+			spinUntilStop(debug, startIndex, stopChan)
 		}()
 
 		for {
@@ -151,7 +155,7 @@ func main() {
 		if debug {
 			log.Printf("Picked up at %s", colorize(wheel[finalIndex]))
 		}
-		result := spinWithInertia(finalIndex)
+		result := spinWithInertia(debug, finalIndex)
 		fmt.Printf("✅ Landed on: %s\n\n", colorize(result))
 	}
 }
