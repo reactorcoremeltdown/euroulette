@@ -2,19 +2,46 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
 	"github.com/eiannone/keyboard"
 )
 
+var debug bool
+var finalIndex int
 var wheel = []string{
-	"0", "32", "15", "19", "4", "21", "2", "25", "17", "34", "6",
-	"27", "13", "36", "11", "30", "8", "23", "10", "5", "24", "16",
-	"33", "1", "20", "14", "31", "9", "22", "18", "29", "7", "28",
-	"12", "35", "3", "26",
+	" 0", "32", "15", "19", " 4", "21", " 2", "25", "17", "34", " 6",
+	"27", "13", "36", "11", "30", " 8", "23", "10", " 5", "24", "16",
+	"33", " 1", "20", "14", "31", " 9", "22", "18", "29", " 7", "28",
+	"12", "35", " 3", "26",
+}
+
+var redNumbers = map[string]bool{
+	" 1": true, " 3": true, " 5": true, " 7": true, " 9": true, "12": true,
+	"14": true, "16": true, "18": true, "19": true, "21": true, "23": true,
+	"25": true, "27": true, "30": true, "32": true, "34": true, "36": true,
+}
+
+var blackNumbers = map[string]bool{
+	" 2": true, " 4": true, " 6": true, " 8": true, "10": true, "11": true,
+	"13": true, "15": true, "17": true, "20": true, "22": true, "24": true,
+	"26": true, "28": true, "29": true, "31": true, "33": true, "35": true,
+}
+
+func colorize(num string) string {
+	switch {
+	case redNumbers[num]:
+		return "\033[101m" + num + "\033[0m" // red
+	case blackNumbers[num]:
+		return "\033[100m" + num + "\033[0m" // white/gray
+	default:
+		return "\033[102m" + num + "\033[0m" // green (0)
+	}
 }
 
 func cleanupAndExit() {
@@ -23,14 +50,18 @@ func cleanupAndExit() {
 	os.Exit(0)
 }
 
-func spinUntilStop(startIndex int, stopChan chan struct{}) int {
+func spinUntilStop(startIndex int, stopChan chan struct{}) {
 	index := startIndex
 	for {
 		select {
 		case <-stopChan:
-			return index
+			if debug {
+				log.Printf("Stopped at %s", colorize(wheel[index]))
+			}
+			finalIndex = index
+			return
 		default:
-			fmt.Printf("\r⏳ %s ", wheel[index])
+			fmt.Printf("\r⏳ %s ", colorize(wheel[index]))
 			index = (index + 1) % len(wheel)
 			time.Sleep(80 * time.Millisecond)
 		}
@@ -43,7 +74,7 @@ func spinWithInertia(startIndex int) string {
 	steps := rand.Intn(15) + 25
 
 	for i := 0; i < steps; i++ {
-		fmt.Printf("\r🎲 %s ", wheel[index])
+		fmt.Printf("\r🎲 %s ", colorize(wheel[index]))
 		index = (index + 1) % len(wheel)
 		time.Sleep(delay)
 		delay += 10 * time.Millisecond // simulate slowdown
@@ -54,6 +85,11 @@ func spinWithInertia(startIndex int) string {
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
+
+	debug, err := strconv.ParseBool(os.Getenv("EUROULETTE_DEBUG"))
+	if err != nil {
+		debug = false
+	}
 
 	if err := keyboard.Open(); err != nil {
 		panic(err)
@@ -91,10 +127,9 @@ func main() {
 
 		startIndex := rand.Intn(len(wheel))
 		stopChan := make(chan struct{})
-		var finalIndex int
 
 		go func() {
-			finalIndex = spinUntilStop(startIndex, stopChan)
+			spinUntilStop(startIndex, stopChan)
 		}()
 
 		for {
@@ -104,6 +139,7 @@ func main() {
 			}
 			if key == keyboard.KeySpace {
 				close(stopChan)
+				time.Sleep(80 * time.Millisecond)
 				break
 			}
 			if key == keyboard.KeyCtrlC {
@@ -112,7 +148,10 @@ func main() {
 		}
 
 		fmt.Println("\n🌀 Slowing down...")
+		if debug {
+			log.Printf("Picked up at %s", colorize(wheel[finalIndex]))
+		}
 		result := spinWithInertia(finalIndex)
-		fmt.Printf("✅ Landed on: %s\n\n", result)
+		fmt.Printf("✅ Landed on: %s\n\n", colorize(result))
 	}
 }
